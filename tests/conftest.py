@@ -11,8 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "glue_jobs"))
 def spark(tmp_path_factory):
     warehouse = str(tmp_path_factory.mktemp("warehouse"))
     builder = (
-        SparkSession.builder
-        .master("local[2]")
+        SparkSession.builder.master("local[2]")
         .appName("lakehouse-tests")
         .config("spark.sql.warehouse.dir", warehouse)
         .config("spark.sql.shuffle.partitions", "2")

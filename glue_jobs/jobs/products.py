@@ -6,7 +6,6 @@ from utils.validators import apply_validations, _any_null
 from utils.delta_ops import upsert
 from utils.s3_ops import list_keys, read_csv, archive, write_rejects
 
-
 # Matches the real products.csv: product_id, department_id, department, product_name
 _SCHEMA_CASTS = {
     "product_id": IntegerType(),
@@ -14,6 +13,7 @@ _SCHEMA_CASTS = {
     "department": StringType(),
     "product_name": StringType(),
 }
+
 
 # Built lazily inside run(): these call F.col(), which requires an active
 # SparkContext. main.py imports this module before SparkContext() exists, so

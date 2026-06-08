@@ -3,7 +3,6 @@ import boto3
 import pandas as pd
 from pyspark.sql import SparkSession, DataFrame
 
-
 _s3 = boto3.client("s3")
 
 
@@ -40,8 +39,12 @@ def read_csv(spark: SparkSession, bucket: str, key: str) -> DataFrame:
     return spark.createDataFrame(_nan_to_none(pdf))
 
 
-def read_excel(spark: SparkSession, bucket: str, key: str, sheet_name: int | str = 0) -> DataFrame:
-    pdf = pd.read_excel(io.BytesIO(_get_bytes(bucket, key)), sheet_name=sheet_name, engine="openpyxl")
+def read_excel(
+    spark: SparkSession, bucket: str, key: str, sheet_name: int | str = 0
+) -> DataFrame:
+    pdf = pd.read_excel(
+        io.BytesIO(_get_bytes(bucket, key)), sheet_name=sheet_name, engine="openpyxl"
+    )
     return spark.createDataFrame(_nan_to_none(pdf))
 
 
@@ -56,7 +59,9 @@ def archive(src_bucket: str, src_key: str, archive_bucket: str, run_date: str) -
     _s3.delete_object(Bucket=src_bucket, Key=src_key)
 
 
-def write_rejects(df: DataFrame, reject_bucket: str, dataset: str, run_date: str) -> None:
+def write_rejects(
+    df: DataFrame, reject_bucket: str, dataset: str, run_date: str
+) -> None:
     if df.count() == 0:
         return
     dest = f"s3://{reject_bucket}/rejects/{dataset}/{run_date}/"

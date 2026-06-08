@@ -2,21 +2,27 @@ import datetime
 import pytest
 from unittest.mock import patch
 from pyspark.sql.types import (
-    StructType, StructField, IntegerType, DoubleType, DateType, TimestampType
+    StructType,
+    StructField,
+    IntegerType,
+    DoubleType,
+    DateType,
+    TimestampType,
 )
 
 from jobs.orders import run
 from utils.delta_ops import upsert
 
-
-_SCHEMA = StructType([
-    StructField("order_num", IntegerType(), True),
-    StructField("order_id", IntegerType(), True),
-    StructField("user_id", IntegerType(), True),
-    StructField("order_timestamp", TimestampType(), True),
-    StructField("total_amount", DoubleType(), True),
-    StructField("date", DateType(), True),
-])
+_SCHEMA = StructType(
+    [
+        StructField("order_num", IntegerType(), True),
+        StructField("order_id", IntegerType(), True),
+        StructField("user_id", IntegerType(), True),
+        StructField("order_timestamp", TimestampType(), True),
+        StructField("total_amount", DoubleType(), True),
+        StructField("date", DateType(), True),
+    ]
+)
 
 _TODAY = datetime.date.today()
 _YESTERDAY = _TODAY - datetime.timedelta(days=1)
@@ -25,10 +31,10 @@ _TOMORROW = _TODAY + datetime.timedelta(days=1)
 _ROWS = [
     (90, 1, 1990, None, 99.99, _YESTERDAY),
     (41, 2, 5057, None, 49.99, _YESTERDAY),
-    (90, 1, 1990, None, 99.99, _YESTERDAY),   # duplicate order_id → deduped
-    (12, 3, 12, None, -10.00, _YESTERDAY),    # negative total → rejected
-    (13, 4, None, None, 20.00, _YESTERDAY),   # null user_id → rejected
-    (14, 5, 13, None, 15.00, _TOMORROW),      # future date → rejected
+    (90, 1, 1990, None, 99.99, _YESTERDAY),  # duplicate order_id → deduped
+    (12, 3, 12, None, -10.00, _YESTERDAY),  # negative total → rejected
+    (13, 4, None, None, 20.00, _YESTERDAY),  # null user_id → rejected
+    (14, 5, 13, None, 15.00, _TOMORROW),  # future date → rejected
 ]
 
 

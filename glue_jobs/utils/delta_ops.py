@@ -11,12 +11,9 @@ def upsert(
 ) -> None:
     if DeltaTable.isDeltaTable(spark, path):
         dt = DeltaTable.forPath(spark, path)
-        match_condition = " AND ".join(
-            f"target.{k} = source.{k}" for k in merge_keys
-        )
+        match_condition = " AND ".join(f"target.{k} = source.{k}" for k in merge_keys)
         dt.alias("target").merge(
-            df.alias("source"),
-            match_condition
+            df.alias("source"), match_condition
         ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
     else:
         writer = df.write.format("delta").mode("overwrite")

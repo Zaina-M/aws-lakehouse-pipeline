@@ -6,7 +6,6 @@ from pyspark.context import SparkContext
 
 from jobs import products, orders, order_items
 
-
 _REQUIRED_ARGS = [
     "JOB_NAME",
     "DATASET_TYPE",
@@ -42,7 +41,9 @@ def main() -> None:
     dataset_type = args["DATASET_TYPE"]
     handler = _HANDLERS.get(dataset_type)
     if handler is None:
-        raise ValueError(f"Unknown DATASET_TYPE: {dataset_type!r}. Must be one of {list(_HANDLERS)}")
+        raise ValueError(
+            f"Unknown DATASET_TYPE: {dataset_type!r}. Must be one of {list(_HANDLERS)}"
+        )
 
     handler(
         spark=spark,

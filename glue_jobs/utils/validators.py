@@ -5,10 +5,12 @@ from pyspark.sql.column import Column
 
 def null_in(*columns: str) -> Column:
     conditions = [F.col(c).isNull() for c in columns]
-    return conditions[0] if len(conditions) == 1 else F.when(
-        conditions[0], True
-    ).otherwise(
-        null_in(*columns[1:]) if len(columns) > 1 else F.lit(False)
+    return (
+        conditions[0]
+        if len(conditions) == 1
+        else F.when(conditions[0], True).otherwise(
+            null_in(*columns[1:]) if len(columns) > 1 else F.lit(False)
+        )
     )
 
 
@@ -24,17 +26,18 @@ def future_date(column: str) -> Column:
     return F.col(column) > F.current_date()
 
 
-def apply_validations(df: DataFrame, rules: list[tuple[Column, str]]) -> tuple[DataFrame, DataFrame]:
+def apply_validations(
+    df: DataFrame, rules: list[tuple[Column, str]]
+) -> tuple[DataFrame, DataFrame]:
     rejection_col = "_rejection_reason"
     working = df.withColumn(rejection_col, F.lit(None).cast("string"))
 
     for condition, reason in rules:
         working = working.withColumn(
             rejection_col,
-            F.when(
-                F.col(rejection_col).isNull() & condition,
-                F.lit(reason)
-            ).otherwise(F.col(rejection_col))
+            F.when(F.col(rejection_col).isNull() & condition, F.lit(reason)).otherwise(
+                F.col(rejection_col)
+            ),
         )
 
     valid = working.filter(F.col(rejection_col).isNull()).drop(rejection_col)
@@ -51,8 +54,7 @@ def check_referential_integrity(
 ) -> tuple[DataFrame, DataFrame]:
     parent_keys = parent_df.select(F.col(pk_col).alias("__pk")).distinct()
     valid = df.join(parent_keys, F.col(fk_col) == F.col("__pk"), "left_semi")
-    rejected = (
-        df.join(parent_keys, F.col(fk_col) == F.col("__pk"), "left_anti")
-        .withColumn("_rejection_reason", F.lit(rejection_reason))
-    )
+    rejected = df.join(
+        parent_keys, F.col(fk_col) == F.col("__pk"), "left_anti"
+    ).withColumn("_rejection_reason", F.lit(rejection_reason))
     return valid, rejected
