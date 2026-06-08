@@ -1,7 +1,9 @@
 import datetime
-import pytest
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType, DoubleType, DateType
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    DateType,
+)
 
 from utils.validators import (
     _any_null,
@@ -42,7 +44,7 @@ def test_future_date_flags_future(spark):
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     df = spark.createDataFrame(
         [(tomorrow,), (yesterday,)],
-        StructType([StructField("order_date", DateType(), True)])
+        StructType([StructField("order_date", DateType(), True)]),
     )
     result = df.withColumn("bad", future_date("order_date"))
     rows = {r["order_date"]: r["bad"] for r in result.collect()}
@@ -51,10 +53,7 @@ def test_future_date_flags_future(spark):
 
 
 def test_apply_validations_splits_correctly(spark):
-    df = spark.createDataFrame(
-        [(None, 10.0), (1, -5.0), (2, 20.0)],
-        ["id", "price"]
-    )
+    df = spark.createDataFrame([(None, 10.0), (1, -5.0), (2, 20.0)], ["id", "price"])
     rules = [
         (_any_null("id"), "null_id"),
         (negative_value("price"), "negative_price"),

@@ -6,8 +6,8 @@ from utils.validators import apply_validations, _any_null, negative_value, futur
 from utils.delta_ops import upsert
 from utils.s3_ops import list_keys, read_excel, archive, write_rejects
 
-
-# Matches the real orders XLSX: order_num, order_id, user_id, order_timestamp, total_amount, date
+# Matches the real orders XLSX: order_num, order_id, user_id,
+# order_timestamp, total_amount, date
 _SCHEMA_CASTS = {
     "order_num": IntegerType(),
     "order_id": IntegerType(),
@@ -16,6 +16,7 @@ _SCHEMA_CASTS = {
     "total_amount": DoubleType(),
     "date": DateType(),
 }
+
 
 # Built lazily inside run(): these call F.col(), which requires an active
 # SparkContext. main.py imports this module before SparkContext() exists, so
@@ -52,7 +53,9 @@ def run(
         valid, rejected = apply_validations(df, _validation_rules())
 
         delta_path = f"s3://{dwh_bucket}/orders/"
-        upsert(spark, valid, delta_path, merge_keys=["order_id"], partition_cols=["date"])
+        upsert(
+            spark, valid, delta_path, merge_keys=["order_id"], partition_cols=["date"]
+        )
 
         write_rejects(rejected, reject_bucket, "orders", run_date)
         archive(raw_bucket, key, archive_bucket, run_date)

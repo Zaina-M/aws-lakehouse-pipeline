@@ -1,23 +1,24 @@
 import pytest
-from unittest.mock import patch, call
+from unittest.mock import patch
 from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
 from jobs.products import run
 from utils.delta_ops import upsert
 
-
-_SCHEMA = StructType([
-    StructField("product_id", IntegerType(), True),
-    StructField("department_id", IntegerType(), True),
-    StructField("department", StringType(), True),
-    StructField("product_name", StringType(), True),
-])
+_SCHEMA = StructType(
+    [
+        StructField("product_id", IntegerType(), True),
+        StructField("department_id", IntegerType(), True),
+        StructField("department", StringType(), True),
+        StructField("product_name", StringType(), True),
+    ]
+)
 
 _ROWS = [
     (1, 4, "Books", "Product_1"),
     (2, 2, "Books", "Product_2"),
-    (1, 4, "Books", "Product_1 Dup"),   # duplicate product_id → deduped
-    (3, 1, "Toys", None),               # null product_name → rejected
+    (1, 4, "Books", "Product_1 Dup"),  # duplicate product_id → deduped
+    (3, 1, "Toys", None),  # null product_name → rejected
 ]
 
 
@@ -87,7 +88,9 @@ def test_archive_called(spark, sample_df, tmp_path):
     with patches[0], patches[1], patches[2] as mock_archive, patches[3], patches[4]:
         run(spark, "raw", "dwh", "archive", "rejects", "lakehouse_db", "2025-04-01")
 
-    mock_archive.assert_called_once_with("raw", "products/products.csv", "archive", "2025-04-01")
+    mock_archive.assert_called_once_with(
+        "raw", "products/products.csv", "archive", "2025-04-01"
+    )
 
 
 def test_no_keys_skips_all_work(spark):
