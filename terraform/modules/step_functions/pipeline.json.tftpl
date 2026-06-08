@@ -1,0 +1,169 @@
+{
+  "Comment": "Lakehouse ingest pipeline",
+  "StartAt": "IngestDimensions",
+  "States": {
+    "IngestDimensions": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "IngestProducts",
+          "States": {
+            "IngestProducts": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "${glue_job_name}",
+                "Arguments": {
+                  "--DATASET_TYPE": "products",
+                  "--RUN_DATE.$": "$.run_date"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": ["Glue.ConcurrentRunsExceededException"],
+                  "IntervalSeconds": 60,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2.0
+                }
+              ],
+              "TimeoutSeconds": 3600,
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "IngestOrders",
+          "States": {
+            "IngestOrders": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "${glue_job_name}",
+                "Arguments": {
+                  "--DATASET_TYPE": "orders",
+                  "--RUN_DATE.$": "$.run_date"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": ["Glue.ConcurrentRunsExceededException"],
+                  "IntervalSeconds": 60,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2.0
+                }
+              ],
+              "TimeoutSeconds": 3600,
+              "End": true
+            }
+          }
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "ResultPath": "$.dimensions",
+      "Next": "IngestOrderItems"
+    },
+    "IngestOrderItems": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "${glue_job_name}",
+        "Arguments": {
+          "--DATASET_TYPE": "order_items",
+          "--RUN_DATE.$": "$.run_date"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "TimeoutSeconds": 3600,
+      "Next": "StartCrawler"
+    },
+    "StartCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${crawler_name}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["Glue.CrawlerRunningException"],
+          "Next": "WaitForCrawler"
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "WaitForCrawler"
+    },
+    "WaitForCrawler": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "GetCrawlerStatus"
+    },
+    "GetCrawlerStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${crawler_name}"
+      },
+      "ResultSelector": {
+        "State.$": "$.Crawler.State"
+      },
+      "ResultPath": "$.crawler",
+      "Next": "CheckCrawlerStatus"
+    },
+    "CheckCrawlerStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.crawler.State",
+          "StringEquals": "RUNNING",
+          "Next": "WaitForCrawler"
+        },
+        {
+          "Variable": "$.crawler.State",
+          "StringEquals": "READY",
+          "Next": "PipelineSucceeded"
+        }
+      ],
+      "Default": "NotifyFailure"
+    },
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${alert_topic}",
+        "Message.$": "States.Format('Lakehouse pipeline failed. Details: {}', States.JsonToString($))"
+      },
+      "Next": "PipelineFailed"
+    },
+    "PipelineFailed": {
+      "Type": "Fail",
+      "Error": "PipelineFailed",
+      "Cause": "One or more pipeline stages failed"
+    },
+    "PipelineSucceeded": {
+      "Type": "Succeed"
+    }
+  }
+}
