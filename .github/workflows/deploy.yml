@@ -1,0 +1,61 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-west-1
+  ENVIRONMENT: dev
+  TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests before deploy
+        run: pytest tests/ -v --tb=short
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+
+      - name: Package ETL libs
+        run: |
+          mkdir -p dist
+          cd glue_jobs && zip -r ../dist/etl_libs.zip utils/ jobs/
+
+      - name: Resolve S3 scripts bucket name
+        id: tf_output
+        run: |
+          cd envs/${{ env.ENVIRONMENT }}
+          terraform init -input=false
+          SCRIPTS_BUCKET=$(terraform output -raw scripts_bucket_name 2>/dev/null || echo "")
+          echo "scripts_bucket=${SCRIPTS_BUCKET}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Glue scripts to S3
+        run: |
+          aws s3 cp dist/etl_libs.zip s3://${{ steps.tf_output.outputs.scripts_bucket }}/glue_jobs/etl_libs.zip
+          aws s3 cp glue_jobs/main.py s3://${{ steps.tf_output.outputs.scripts_bucket }}/glue_jobs/main.py
+
+      - name: Terraform apply
+        run: |
+          cd envs/${{ env.ENVIRONMENT }}
+          terraform apply -auto-approve -input=false -var-file=terraform.tfvars
