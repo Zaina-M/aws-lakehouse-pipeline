@@ -15,7 +15,10 @@ def null_in(*columns: str) -> Column:
 
 
 def _any_null(*columns: str) -> Column:
-    return F.greatest(*[F.col(c).isNull().cast("int") for c in columns]).cast("boolean")
+    cols = [F.col(c).isNull().cast("int") for c in columns]
+    if len(cols) == 1:
+        return cols[0].cast("boolean")
+    return F.greatest(*cols).cast("boolean")
 
 
 def negative_value(column: str) -> Column:

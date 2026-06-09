@@ -3,6 +3,8 @@ from pyspark.sql.types import (
     StructType,
     StructField,
     DateType,
+    IntegerType,
+    DoubleType,
 )
 
 from utils.validators import (
@@ -70,7 +72,11 @@ def test_apply_validations_splits_correctly(spark):
 
 
 def test_apply_validations_first_rule_wins(spark):
-    df = spark.createDataFrame([(None, -5.0)], ["id", "price"])
+    schema = StructType([
+        StructField("id", IntegerType(), True),
+        StructField("price", DoubleType(), True),
+    ])
+    df = spark.createDataFrame([(None, -5.0)], schema)
     rules = [
         (_any_null("id"), "null_id"),
         (negative_value("price"), "negative_price"),
