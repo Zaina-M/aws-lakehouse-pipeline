@@ -5,23 +5,28 @@ locals {
 }
 
 resource "aws_s3_bucket" "raw" {
-  bucket = "${local.prefix}-raw"
+  bucket        = "${local.prefix}-raw"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket" "scripts" {
-  bucket = "${local.prefix}-scripts"
+  bucket        = "${local.prefix}-scripts"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket" "dwh" {
-  bucket = "${local.prefix}-dwh"
+  bucket        = "${local.prefix}-dwh"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket" "archive" {
-  bucket = "${local.prefix}-archive"
+  bucket        = "${local.prefix}-archive"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket" "rejects" {
-  bucket = "${local.prefix}-rejects"
+  bucket        = "${local.prefix}-rejects"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "raw" {
