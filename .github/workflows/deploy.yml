@@ -58,7 +58,7 @@ jobs:
         run: |
           cd envs/${{ env.ENVIRONMENT }}
           terraform init -input=false
-          terraform apply -auto-approve -input=false -var-file=terraform.tfvars
+          terraform apply -auto-approve -input=false
 
       - name: Upload Glue scripts to S3
         run: |

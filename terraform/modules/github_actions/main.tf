@@ -53,6 +53,16 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         ]
       },
       {
+        Sid    = "TerraformStateLock"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = "arn:aws:dynamodb:*:*:table/${var.project}-${var.environment}-tflock"
+      },
+      {
         Sid      = "Glue"
         Effect   = "Allow"
         Action   = ["glue:*"]
@@ -95,6 +105,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:CreatePolicyVersion",
           "iam:DeletePolicyVersion",
           "iam:ListPolicyVersions",
+          "iam:TagPolicy",
+          "iam:UntagPolicy",
+          "iam:ListPolicyTags",
           "iam:GetOpenIDConnectProvider",
           "iam:ListOpenIDConnectProviders",
         ]
@@ -110,6 +123,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "logs:PutRetentionPolicy",
           "logs:ListTagsLogGroup",
           "logs:ListTagsForResource",
+          "logs:TagResource",
+          "logs:UntagResource",
         ]
         Resource = "*"
       },

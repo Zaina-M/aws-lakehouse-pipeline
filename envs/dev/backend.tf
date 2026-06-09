@@ -1,20 +1,16 @@
-# Remote state — uncomment and replace placeholders when ready.
+# Remote state — shared between local runs and CI so resources are never
+# re-created from an empty state. The bucket and lock table are created once
+# by `envs/bootstrap` (see envs/bootstrap/README or the runbook).
 #
-# Pre-requisites:
-#   aws s3 mb s3://YOUR-TF-STATE-BUCKET --region eu-west-1
-#   aws dynamodb create-table --table-name terraform-state-lock \
-#     --attribute-definitions AttributeName=LockID,AttributeType=S \
-#     --key-schema AttributeName=LockID,KeyType=HASH \
-#     --billing-mode PAY_PER_REQUEST
-#
-# Then run: terraform init -reconfigure
+# Bucket naming matches the deploy role's S3 wildcard (lakehouse-dev-*),
+# so no extra IAM grant is needed for state access.
 
-# terraform {
-#   backend "s3" {
-#     bucket         = "YOUR-TF-STATE-BUCKET"
-#     key            = "lakehouse/dev/terraform.tfstate"
-#     region         = "eu-west-1"
-#     encrypt        = true
-#     dynamodb_table = "terraform-state-lock"
-#   }
-# }
+terraform {
+  backend "s3" {
+    bucket         = "lakehouse-dev-884596874091-tfstate"
+    key            = "lakehouse/dev/terraform.tfstate"
+    region         = "eu-west-1"
+    encrypt        = true
+    dynamodb_table = "lakehouse-dev-tflock"
+  }
+}
