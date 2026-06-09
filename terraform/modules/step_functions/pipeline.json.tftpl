@@ -142,6 +142,11 @@
         },
         {
           "Variable": "$.crawler.State",
+          "StringEquals": "STOPPING",
+          "Next": "WaitForCrawler"
+        },
+        {
+          "Variable": "$.crawler.State",
           "StringEquals": "READY",
           "Next": "PipelineSucceeded"
         }
