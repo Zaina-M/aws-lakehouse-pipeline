@@ -187,6 +187,84 @@ The Glue crawler at the end of the pipeline keeps the catalog's partition metada
 
 The Step Functions role **cannot touch S3 at all.** All data work is done by Glue. If a bug in the state machine definition accidentally caused a wrong step to execute, it physically could not corrupt the Delta tables — it doesn't have permission. This is called least-privilege and it limits the blast radius of any mistake.
 
+### 7. GitHub Actions + OIDC — secure CI/CD without stored credentials
+
+**The problem with access keys in CI/CD**
+
+The obvious approach to automating deployments is to create an IAM user, generate long-lived access keys, and store them as GitHub Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). This works — but those keys are permanent. They remain valid until someone manually rotates or deletes them. If they ever appear in a log line, a debug output, or a misconfigured secret, an attacker has indefinite AWS access.
+
+**What OIDC solves**
+
+OIDC (OpenID Connect) lets GitHub *prove its identity* to AWS without any stored credentials. Here is what happens on every workflow run:
+
+```
+GitHub Actions runner
+      │
+      │  1. "I am workflow run #abc on repo Zaina-M/aws-lakehouse-pipeline"
+      │     (a signed JWT issued by GitHub's own OIDC provider)
+      ▼
+AWS STS (Security Token Service)
+      │
+      │  2. Checks: "Do I trust GitHub's OIDC provider?" → yes (configured once in IAM)
+      │     "Does this JWT match the trust policy on any role?" → yes
+      │
+      │  3. Issues temporary credentials valid for at most 1 hour
+      ▼
+GitHub Actions runner
+      │  4. Uses those credentials for the duration of the job
+      │  5. Job ends → credentials expire → nothing persists
+```
+
+Nothing is stored in GitHub. There is nothing to rotate, nothing to leak, and nothing an attacker can reuse after the job finishes.
+
+**The two AWS-side pieces**
+
+| Piece | What it does |
+|---|---|
+| **OIDC Identity Provider** | A one-time account setting: "I trust tokens signed by `token.actions.githubusercontent.com`" |
+| **IAM Role + trust policy** | Says who can assume the role: only your specific GitHub repo. The `sub` condition locks it to `repo:Zaina-M/aws-lakehouse-pipeline:*` — no other repo can assume it even if it knows the role ARN |
+
+The role's *permission policy* (what AWS actions are allowed) is kept separate from the *trust policy* (who can assume the role). Least-privilege applies to both.
+
+**What changes in the workflow**
+
+Before — long-lived keys:
+```yaml
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    aws-region: eu-west-1
+```
+
+After — OIDC (no credentials stored):
+```yaml
+permissions:
+  id-token: write   # allows the runner to request an OIDC token from GitHub
+  contents: read
+
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+    aws-region: eu-west-1
+```
+
+`AWS_DEPLOY_ROLE_ARN` is not a credential — it is just a resource identifier (like a URL). Even if it leaked it would be harmless: the trust policy only allows your repo to assume it.
+
+**How it is provisioned in this project**
+
+The `terraform/modules/github_actions/` module creates both pieces:
+- `aws_iam_openid_connect_provider` — registers GitHub as a trusted issuer in your AWS account (created once)
+- `aws_iam_role` with a trust policy scoped to this repo
+- An inline policy giving the role only the permissions the deploy job needs (S3 write, Glue, Step Functions, IAM for Terraform, SNS, CloudWatch Logs)
+
+After `terraform apply`, the role ARN appears as a Terraform output:
+```
+github_actions_role_arn = "arn:aws:iam::884596874091:role/lakehouse-dev-github-actions"
+```
+
+Add that value as a GitHub repository secret named `AWS_DEPLOY_ROLE_ARN` (Settings → Secrets and variables → Actions) and the deploy workflow works — permanently, with no keys to manage.
+
 ---
 
 ## The ordering problem: why order_items always goes last
@@ -907,6 +985,7 @@ These are things a real team would do over time. Items already implemented are m
 ### Security
 - **DONE — Least-privilege IAM:** Each service role has only the permissions it actually needs.
 - **DONE — Five separate S3 buckets:** Deletion rights on `raw` cannot cascade to deletion rights on `dwh`.
+- **DONE — OIDC for CI/CD:** GitHub Actions assumes an IAM role via short-lived tokens — no long-lived access keys stored anywhere.
 - Add customer-managed KMS keys for S3 encryption: lets you rotate encryption keys on your own schedule rather than AWS's.
 - Restrict Glue job internet egress: run Glue inside a VPC with no outbound internet route, so code bugs can't phone home or exfiltrate data.
 
@@ -949,6 +1028,10 @@ These are things a real team would do over time. Items already implemented are m
 | **SNS** | Amazon's notification service. Publish one message to a topic; it fans out to all subscribers (email, SMS, Lambda, etc.). |
 | **CloudWatch** | AWS's monitoring service. Records metrics from all AWS services and can trigger alarms when values cross thresholds. |
 | **Least privilege** | Security principle: give each service only the permissions it strictly needs, nothing more. Limits damage if something goes wrong. |
+| **OIDC** | OpenID Connect — a protocol that lets one system (GitHub) prove its identity to another (AWS) using a signed token instead of a password. |
+| **JWT** | JSON Web Token — a signed, short-lived credential that carries identity claims. GitHub issues one per workflow run; AWS verifies it and exchanges it for temporary credentials. |
+| **STS** | AWS Security Token Service — the AWS service that issues temporary credentials when a trusted identity (like a GitHub OIDC token) requests them. |
+| **Trust policy** | The part of an IAM role that controls *who* can assume it (e.g. only a specific GitHub repo). Separate from the permission policy, which controls *what* the role can do once assumed. |
 | **Module** | A reusable chunk of Terraform code with its own variables and outputs. Groups related resources together. |
 | **State file** | A file Terraform keeps that maps your `.tf` configuration to the actual AWS resources it created. |
 | **terraform plan** | A dry run showing exactly what Terraform *would* create, change, or destroy. Nothing happens until you run `apply`. |

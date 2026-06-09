@@ -42,3 +42,8 @@ variable "alert_email" {
   type        = string
   description = "Email address to receive pipeline failure notifications"
 }
+
+variable "github_repo" {
+  type        = string
+  description = "GitHub repository in owner/repo format (e.g. Zaina-M/aws-lakehouse-pipeline)"
+}

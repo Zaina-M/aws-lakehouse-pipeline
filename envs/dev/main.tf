@@ -36,6 +36,13 @@ module "glue" {
   num_workers         = var.glue_job_num_workers
 }
 
+module "github_actions" {
+  source      = "../../terraform/modules/github_actions"
+  project     = var.project
+  environment = var.environment
+  github_repo = var.github_repo
+}
+
 module "step_functions" {
   source      = "../../terraform/modules/step_functions"
   project     = var.project

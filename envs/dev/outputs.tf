@@ -37,3 +37,8 @@ output "state_machine_arn" {
 output "alert_topic_arn" {
   value = module.step_functions.alert_topic_arn
 }
+
+output "github_actions_role_arn" {
+  value       = module.github_actions.role_arn
+  description = "Paste this ARN as role-to-assume in .github/workflows/deploy.yml"
+}
