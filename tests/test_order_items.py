@@ -1,6 +1,7 @@
 import datetime
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from pyspark.sql.readwriter import DataFrameReader
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -64,10 +65,8 @@ def _run(spark, sample_df, orders_df, products_df, delta_path):
         written["ids"] = {r["id"] for r in df.collect()}
         upsert(sp, df, delta_path, **kw)
 
-    delta_reader = MagicMock()
-    delta_reader.load.side_effect = lambda path: (
-        orders_df if "orders" in path else products_df
-    )
+    def fake_load(self, path=None, **kw):
+        return orders_df if "orders" in str(path) else products_df
 
     with (
         patch(
@@ -78,7 +77,7 @@ def _run(spark, sample_df, orders_df, products_df, delta_path):
         patch("jobs.order_items.archive"),
         patch("jobs.order_items.write_rejects") as mock_rejects,
         patch("jobs.order_items.upsert", side_effect=fake_upsert),
-        patch.object(spark.read, "format", return_value=delta_reader),
+        patch.object(DataFrameReader, "load", fake_load),
     ):
         run(spark, "raw", "dwh", "archive", "rejects", "lakehouse_db", "2025-04-01")
 
